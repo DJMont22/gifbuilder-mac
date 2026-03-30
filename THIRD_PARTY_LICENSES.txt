@@ -1,0 +1,53 @@
+GIF Builder Studio - 
+
+Please do not Redistribute or modify or copy.
+
+Third-Party Notices
+
+This product bundles or depends on third-party software components.
+This notice file is provided with the application for convenience.
+Please review the original upstream license texts for full terms.
+
+Main bundled/runtime components
+
+1. Python
+   License: Python Software Foundation License Version 2
+   License information: https://docs.python.org/3.12/license.html
+
+2. Tcl/Tk
+   License: Tcl/Tk license
+   License information: https://www.tcl-lang.org/software/tcltk/license.html
+   Additional Tcl/Tk license text may also be present in the installed
+   application files as tk\\license.terms.
+
+3. Pillow
+   License: MIT-CMU
+   License information: https://pillow.readthedocs.io/en/stable/about.html
+
+4. NumPy
+   License: Modified BSD license
+   License information: https://numpy.org/doc/stable/license.html
+
+5. OpenCV
+   License: Apache License 2.0
+   License information: https://opencv.org/license/
+
+6. FFmpeg
+   Some Windows builds created from the stock opencv-python package may
+   bundle FFmpeg through files named like opencv_videoio_ffmpeg*.dll.
+   License: LGPL v2.1 or later, unless a specific build enables GPL parts.
+   Legal/compliance information: https://ffmpeg.org/legal.html
+   Source downloads: https://ffmpeg.org/download.html
+
+7. OpenSSL
+   Some builds may bundle OpenSSL runtime libraries such as libssl-3.dll
+   and libcrypto-3.dll.
+   License information: https://www.openssl.org/source/license.html
+
+Notes
+
+- This application is distributed as a compiled desktop program.
+- Third-party components remain under their own licenses.
+- If a given build does not include a listed component, the notice for that
+  component may not apply to that specific build.
+
