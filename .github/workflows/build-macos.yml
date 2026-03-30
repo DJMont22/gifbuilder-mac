@@ -8,12 +8,13 @@ on:
 
 jobs:
   build-macos:
+    name: macOS ${{ matrix.arch_name }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - arch_name: apple-silicon
-            runs_on: macos-latest
+            runs_on: macos-15
             target_arch: arm64
           - arch_name: intel
             runs_on: macos-15-intel
@@ -30,51 +31,112 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Show Python and repo files
-        run: |
-          python --version
-          python -c "import sys; print(sys.executable)"
-          echo "--- repo root ---"
-          ls -la
-          echo "--- python files ---"
-          find . -maxdepth 2 -type f \( -name '*.py' -o -name '*.txt' -o -name '*.png' -o -name '*.icns' \) | sort
-
-      - name: Detect entry script
+      - name: Show repo files
         shell: bash
         run: |
-          if [[ -f gif_builder_studio_mac_ready.py ]]; then
-            echo "ENTRY_SCRIPT=gif_builder_studio_mac_ready.py" >> "$GITHUB_ENV"
-            echo "Using gif_builder_studio_mac_ready.py"
-          elif [[ -f gif_builder_studio.py ]]; then
-            echo "ENTRY_SCRIPT=gif_builder_studio.py" >> "$GITHUB_ENV"
-            echo "Using gif_builder_studio.py"
-          else
-            echo "Could not find gif_builder_studio_mac_ready.py or gif_builder_studio.py in repo root"
+          python --version
+          echo "--- repo root ---"
+          ls -la
+          echo "--- files up to depth 3 ---"
+          find . -maxdepth 3 -type f | sort
+
+      - name: Detect app entry script
+        shell: bash
+        run: |
+          set -euo pipefail
+          ENTRY_SCRIPT=""
+          for candidate in \
+            ./gif_builder_studio.py \
+            ./gif_builder_studio_mac_ready.py
+          do
+            if [[ -f "$candidate" ]]; then
+              ENTRY_SCRIPT="$candidate"
+              break
+            fi
+          done
+
+          if [[ -z "$ENTRY_SCRIPT" ]]; then
+            ENTRY_SCRIPT="$(find . -type f \( -name 'gif_builder_studio.py' -o -name 'gif_builder_studio_mac_ready.py' \) | head -n 1 || true)"
+          fi
+
+          if [[ -z "$ENTRY_SCRIPT" ]]; then
+            echo "Could not find gif_builder_studio.py or gif_builder_studio_mac_ready.py anywhere in the repo."
             exit 1
           fi
 
-      - name: Install dependencies
+          echo "ENTRY_SCRIPT=$ENTRY_SCRIPT" >> "$GITHUB_ENV"
+          echo "Detected entry script: $ENTRY_SCRIPT"
+
+      - name: Detect optional assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          ICON_PATH="$(find . -type f \( -iname 'gbs_icon.icns' -o -iname 'gbs_icon.png' -o -iname 'gbs icon.ico' \) | head -n 1 || true)"
+          LICENSE_PATH="$(find . -type f -name 'THIRD_PARTY_LICENSES.txt' | head -n 1 || true)"
+
+          echo "ICON_PATH=$ICON_PATH" >> "$GITHUB_ENV"
+          echo "LICENSE_PATH=$LICENSE_PATH" >> "$GITHUB_ENV"
+          echo "Detected icon: ${ICON_PATH:-<none>}"
+          echo "Detected license file: ${LICENSE_PATH:-<none>}"
+
+      - name: Install build dependencies
+        shell: bash
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install Pillow>=10.0.0 numpy>=1.26.0 opencv-python-headless>=4.10.0 pyinstaller>=6.0.0
+          python -m pip install \
+            Pillow>=10.0.0 \
+            numpy>=1.26.0 \
+            opencv-python-headless>=4.10.0 \
+            pyinstaller>=6.0.0
 
       - name: Compile-check source
+        shell: bash
         run: |
           python -m py_compile "$ENTRY_SCRIPT"
-          python -m py_compile build_scripts/build_macos.py
 
-      - name: Build app bundle
+      - name: Build .app bundle with PyInstaller
+        shell: bash
         env:
           TARGET_ARCH: ${{ matrix.target_arch }}
-          BUNDLE_ID: com.example.gifbuilderstudio
-          ENTRY_SCRIPT: ${{ env.ENTRY_SCRIPT }}
         run: |
-          python build_scripts/build_macos.py
+          set -euo pipefail
+          APP_NAME="GIF Builder Studio"
+
+          rm -rf build dist
+          rm -f "$APP_NAME.spec"
+
+          CMD=(python -m PyInstaller "$ENTRY_SCRIPT"
+            --noconfirm
+            --clean
+            --windowed
+            --onedir
+            --name "$APP_NAME"
+            --target-arch "$TARGET_ARCH"
+            --argv-emulation
+            --osx-bundle-identifier "com.montanajay.gifbuilderstudio")
+
+          if [[ -n "${ICON_PATH:-}" && -f "$ICON_PATH" ]]; then
+            CMD+=(--icon "$ICON_PATH")
+          fi
+
+          if [[ -n "${LICENSE_PATH:-}" && -f "$LICENSE_PATH" ]]; then
+            CMD+=(--add-data "$LICENSE_PATH:.")
+          fi
+
+          printf '+ %q ' "${CMD[@]}"
+          printf '\n'
+          "${CMD[@]}"
+
+          test -d "dist/$APP_NAME.app"
 
       - name: Zip app bundle
+        shell: bash
         run: |
+          set -euo pipefail
+          APP_NAME="GIF Builder Studio"
           cd dist
-          ditto -c -k --sequesterRsrc --keepParent "GIF Builder Studio.app" "GIF-Builder-Studio-macos-${{ matrix.arch_name }}.zip"
+          ditto -c -k --sequesterRsrc --keepParent "$APP_NAME.app" "GIF-Builder-Studio-macos-${{ matrix.arch_name }}.zip"
+          ls -la
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
