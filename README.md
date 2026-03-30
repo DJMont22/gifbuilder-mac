@@ -1,0 +1,2 @@
+# gifbuilder-mac
+macgifbyuiolder
